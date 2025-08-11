@@ -1,0 +1,73 @@
+name: Cross platform build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: windows-latest
+            c_compiler: g++
+            cpp_compiler: g++
+          - os: ubuntu-latest
+            c_compiler: gcc
+            cpp_compiler: g++
+          - os: macos-latest
+            c_compiler: clang
+            cpp_compiler: clang++
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set reusable strings
+      id: strings
+      shell: bash
+      run: echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+
+    - name: Configure CMake for secure build
+      shell: bash
+      run: |
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          cmake -S . -B "$(cygpath -u "${{ steps.strings.outputs.build-output-dir }}")" -DSECURE_BUILD=ON
+          cmake --build "$(cygpath -u "${{ steps.strings.outputs.build-output-dir }}")" --config Debug
+        else
+          cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} -DSECURE_BUILD=ON
+          cmake --build ${{ steps.strings.outputs.build-output-dir }} --config Debug
+        fi
+
+    - name: Run
+      shell: bash
+      run: |
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          "$(cygpath -u "${{ steps.strings.outputs.build-output-dir }}")/main.exe"
+        else
+          "${{ steps.strings.outputs.build-output-dir }}/main"
+        fi
+
+    - name: Configure CMake for unsecure build
+      shell: bash
+      run: |
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          cmake -S . -B "$(cygpath -u "${{ steps.strings.outputs.build-output-dir }}")" -DSECURE_BUILD=OFF
+          cmake --build "$(cygpath -u "${{ steps.strings.outputs.build-output-dir }}")" --config Debug
+        else
+          cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} -DSECURE_BUILD=OFF
+          cmake --build ${{ steps.strings.outputs.build-output-dir }} --config Debug
+        fi
+
+    - name: Run
+      shell: bash
+      run: |
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          "$(cygpath -u "${{ steps.strings.outputs.build-output-dir }}")/main.exe"
+        else
+          "${{ steps.strings.outputs.build-output-dir }}/main"
+        fi
